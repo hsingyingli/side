@@ -1,8 +1,52 @@
 import numpy  as np 
 import pandas as pd
 import matplotlib.pyplot as plt 
+import torch
 from sklearn.preprocessing import MinMaxScaler
 
+
+
+
+def batch_for_few_shot(x, y , batch_size):
+    # x shape : num , channel , height , weight
+    # y shape : num 
+    y_     = []
+    target = []
+    for i in range(len(y)):
+        if (i+1) % batch_size == 0 :
+            y_.append([0, 0])
+            target.append(y[i])
+        elif(y[i] == 0):
+            y_.append([1, 0])
+        elif(y[i] == 1):
+            y_.append([0, 1])
+
+    return torch.FloatTensor(x), torch.FloatTensor(np.array(y_)) ,torch.LongTensor(np.array(target))
+
+
+
+
+
+
+
+
+
+def to_window(feature, label, time_step, image_type):
+    #input : (days , feature)
+    f = []
+    
+    for i in range( time_step , len(feature)):
+        tmp = feature[i-time_step:i , :]
+        if(image_type == 'GASF'):
+            f.append(GASF(tmp))
+        elif(image_type == 'GADF'):
+            f.append(GADF(tmp))
+
+    feature = np.array(f)
+    label   = label[time_step:]
+
+    return torch.FloatTensor(feature), torch.LongTensor(label)
+    
 
 
 
@@ -51,8 +95,9 @@ def GASF(data):
    
     return gasf
 def GADF(data):
-    # input shape: (days, feature size)
+    # input shape : (days, feature size)
     # print(data.shape)
+    # output shape: (feature size, days, days)
     gadf = []
     ploar_data = Ploar_Coordinate(data, 0)
 
@@ -70,6 +115,31 @@ def GADF(data):
     return gadf
 
 
+def get_label(path):
+    df = pd.read_csv(path)
+    label = []
+    for i in range(len(df)-3):
+        if(np.mean(df["Close Price"].iloc[i:i+3]) - df["Close Price"].iloc[i] > 0.001):
+            label.append(1)
+        elif(df["Close Price"].iloc[i]  - np.mean(df["Close Price"].iloc[i:i+3]) > 0.001):
+            label.append(0)
+        else:
+            label.append(-1)
+    label.extend([-2,-2,-2])
+    last = 0
+    for i in range(len(label)):
+        if(label[i] == -1):
+            label[i] = last
+        last = label[i]
+    df['label'] = label
+    df.to_csv("./data/S&P5002.csv")
+    print(df)
+
+
+
+
+
+
 
 
 
@@ -79,36 +149,22 @@ def main():
     df = pd.read_csv(path, index_col = "Ntime")
     # print(df.shape)
     # print(df.info)
-    value = GASF(df.iloc[:30,:].values)
+    value = GASF(df.iloc[:20,:].values)
+    print(df.iloc[:30,:].shape)
+    print(value.shape)
+    input()
     plt.imshow(value[0])
     plt.show()
 
 
 
     value = GADF(df.iloc[:30,:].values)
+    print(df.iloc[:30,:].shape)
+    print(value.shape)
+    input()
+    plt.imsho
     plt.imshow(value[0])
     plt.show()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
